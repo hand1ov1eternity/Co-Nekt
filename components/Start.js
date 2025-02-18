@@ -1,49 +1,52 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TextInput, TouchableOpacity, ImageBackground } from 'react-native';
+import { getAuth, signInAnonymously } from "firebase/auth";
 
 const Start = ({ navigation }) => {
-  const [name, setName] = useState('');  // Stores the user's name input
-  const [color, setColor] = useState('#090C08'); // Default background color
+  const [name, setName] = useState('');
+  const [color, setColor] = useState('#090C08');
 
-  // Function to navigate to the Chat screen with the user's name and chosen color
-  const handleStartChat = () => {
-    if (name) {
-      navigation.navigate('Chat', { name, color });
-    }
+  // Function to sign in anonymously
+  const signInUser = () => {
+    const auth = getAuth();
+    signInAnonymously(auth)
+      .then((userCredential) => {
+        const userId = userCredential.user.uid;
+        navigation.navigate('Chat', { userId, name, color }); // Navigate after login
+      })
+      .catch(error => {
+        console.error("Error signing in anonymously:", error);
+      });
   };
 
   return (
     <ImageBackground 
-      source={require('../assets/background-image.png')}  // Background image
+      source={require('../assets/background-image.png')}
       style={styles.container}
     >
       <Text style={styles.title}>Co-Nekt</Text>
-      
-      {/* Text input for the user to enter their name */}
+
       <TextInput
         style={styles.input}
-        placeholder="Your Name"  // Placeholder text inside the input field
-        placeholderTextColor="#000000"  // Darker placeholder color
-        onChangeText={setName}  // Updates the name state when the user types
-        value={name}  // Binds input value to the state
+        placeholder="Your Name"
+        placeholderTextColor="#000000"
+        onChangeText={setName}
+        value={name}
       />
       
-      {/* Label for background color selection */}
       <Text style={styles.label}>Choose Background Color</Text>
-      
+
       <View style={styles.colorOptions}>
-        {/* Render color options for the user to choose */}
         {['#090C08', '#474056', '#8A95A5', '#B9C6AE'].map((bgColor) => (
           <TouchableOpacity
             key={bgColor}
-            style={[styles.colorButton, { backgroundColor: bgColor }]}  // Dynamic button color
-            onPress={() => setColor(bgColor)}  // Updates the selected background color
+            style={[styles.colorButton, { backgroundColor: bgColor }]}
+            onPress={() => setColor(bgColor)}
           />
         ))}
       </View>
-      
-      {/* Button to start the chat and navigate to the Chat screen */}
-      <TouchableOpacity style={styles.button} onPress={handleStartChat}>
+
+      <TouchableOpacity style={styles.button} onPress={signInUser}>
         <Text style={styles.buttonText}>Start Chatting</Text>
       </TouchableOpacity>
     </ImageBackground>
@@ -55,51 +58,52 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,  // Padding for the whole screen content
+    padding: 20,
   },
   title: {
     fontSize: 45,
     fontWeight: '600',
-    color: '#FFFFFF',  // White title color
-    marginBottom: 40,  // Spacing below the title
+    color: '#FFFFFF',
+    marginBottom: 40,
   },
   input: {
     height: 50,
-    width: '80%',  // Input field width
-    borderColor: '#000000',  // Black border for visibility
+    width: '80%',
+    borderColor: '#000000',
     borderWidth: 1,
     borderRadius: 5,
     paddingHorizontal: 10,
-    marginBottom: 20,  // Spacing below the input
-    color: '#000000',  // Black text inside the input field
+    marginBottom: 20,
+    color: '#000000',
   },
   label: {
     fontSize: 16,
     fontWeight: '300',
-    color: '#000000',  // Dark text color for better visibility
-    marginBottom: 10,  // Spacing below the label
+    color: '#000000',
+    marginBottom: 10,
   },
   colorOptions: {
-    flexDirection: 'row',  // Align color buttons horizontally
-    marginBottom: 20,  // Spacing below the color buttons
+    flexDirection: 'row',
+    marginBottom: 20,
   },
   colorButton: {
     width: 50,
     height: 50,
-    margin: 5,  // Margin between color buttons
-    borderRadius: 25,  // Round shape for color buttons
+    margin: 5,
+    borderRadius: 25,
   },
   button: {
-    backgroundColor: '#757083',  // Button background color
+    backgroundColor: '#757083',
     paddingVertical: 10,
     paddingHorizontal: 20,
-    borderRadius: 5,  // Rounded corners for the button
+    borderRadius: 5,
   },
   buttonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',  // White text color for the button
+    color: '#FFFFFF',
   },
 });
 
 export default Start;
+
