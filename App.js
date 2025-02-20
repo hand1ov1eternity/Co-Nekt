@@ -8,7 +8,12 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 // Import Firebase
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, disableNetwork, enableNetwork } from "firebase/firestore";
+
+// Import network detection
+import { useNetInfo } from "@react-native-community/netinfo";
+import { useEffect } from "react";
+import { Alert } from "react-native";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -30,12 +35,23 @@ const db = getFirestore(app);
 const Stack = createNativeStackNavigator();
 
 const App = () => {
+  const connectionStatus = useNetInfo();
+
+  useEffect(() => {
+    if (connectionStatus.isConnected === false) {
+      Alert.alert("Connection Lost!");
+      disableNetwork(db);
+    } else if (connectionStatus.isConnected === true) {
+      enableNetwork(db);
+    }
+  }, [connectionStatus.isConnected]);
+
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Start">
         <Stack.Screen name="Start" component={Start} />
         <Stack.Screen name="Chat">
-          {(props) => <Chat {...props} db={db} />}
+          {(props) => <Chat {...props} db={db} isConnected={connectionStatus.isConnected} />}
         </Stack.Screen>
       </Stack.Navigator>
     </NavigationContainer>

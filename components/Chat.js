@@ -1,48 +1,72 @@
 import { useState, useEffect } from "react";
-import { StyleSheet, View, Platform, KeyboardAvoidingView } from 'react-native';
-import { Bubble, GiftedChat } from "react-native-gifted-chat";
+import { StyleSheet, View, Platform, KeyboardAvoidingView } from "react-native";
+import { Bubble, GiftedChat, InputToolbar } from "react-native-gifted-chat";
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const Chat = ({ route, navigation, db }) => {
+const Chat = ({ route, navigation, db, isConnected }) => {
   const [messages, setMessages] = useState([]);
   const { userId, name, color } = route.params;
 
   useEffect(() => {
     navigation.setOptions({ title: name });
 
-    // Create a query to fetch messages sorted by createdAt in descending order
-    const messagesQuery = query(collection(db, "messages"), orderBy("createdAt", "desc"));
+    let unsubscribe;
 
-    // Set up Firestore real-time listener
-    const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
-      const messagesList = snapshot.docs.map(doc => {
-        const data = doc.data();
-        
-        // Check if createdAt is valid and use a fallback if it's null or undefined
-        const createdAt = data.createdAt ? data.createdAt.toDate() : new Date();  // Default to current time if null
+    const loadCachedMessages = async () => {
+      try {
+        const cachedMessages = await AsyncStorage.getItem("messages");
+        if (cachedMessages) {
+          setMessages(JSON.parse(cachedMessages));
+        }
+      } catch (error) {
+        console.error("Failed to load messages from cache:", error);
+      }
+    };
 
-        return {
-          _id: doc.id,
-          ...data,
-          createdAt: createdAt,  // Ensure createdAt is a valid Date
-        };
+    if (isConnected) {
+      const messagesQuery = query(collection(db, "messages"), orderBy("createdAt", "desc"));
+
+      unsubscribe = onSnapshot(messagesQuery, async (snapshot) => {
+        const messagesList = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            _id: doc.id,
+            ...data,
+            createdAt: data.createdAt ? data.createdAt.toDate() : new Date(),
+          };
+        });
+
+        setMessages(messagesList);
+
+        try {
+          await AsyncStorage.setItem("messages", JSON.stringify(messagesList));
+        } catch (error) {
+          console.error("Failed to cache messages:", error);
+        }
       });
-      setMessages(messagesList);
-    });
+    } else {
+      loadCachedMessages();
+    }
 
-    // Cleanup function to unsubscribe from the listener when the component unmounts
-    return () => unsubscribe();
-  }, [db, name, navigation]);
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [db, isConnected, name, navigation]);
 
   const onSend = (newMessages) => {
-    addDoc(collection(db, "messages"), {
-      ...newMessages[0], 
-      createdAt: serverTimestamp(), // Ensure Firestore stores a proper timestamp
-      user: {
-        _id: userId, // Attach the logged-in user ID
-        name: name,  // Attach the user's name
-      }
-    });
+    if (isConnected) {
+      addDoc(collection(db, "messages"), {
+        ...newMessages[0], 
+        createdAt: serverTimestamp(),
+        user: {
+          _id: userId,
+          name: name,
+        }
+      });
+    } else {
+      alert("You're offline. Messages will be sent when you're back online.");
+    }
   };
 
   const renderBubble = (props) => (
@@ -55,18 +79,25 @@ const Chat = ({ route, navigation, db }) => {
     />
   );
 
+  // Hide InputToolbar when offline
+  const renderInputToolbar = (props) => {
+    if (isConnected) return <InputToolbar {...props} />;
+    return null;
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: color }]}>
       <GiftedChat
         messages={messages}
         renderBubble={renderBubble}
-        onSend={messages => onSend(messages)}
+        renderInputToolbar={renderInputToolbar} // 👈 Prevents message input when offline
+        onSend={(messages) => onSend(messages)}
         user={{
-          _id: userId, // The logged-in user's ID
-          name: name,  // The user's chosen name
+          _id: userId,
+          name: name,
         }}
       />
-      {Platform.OS === 'android' ? <KeyboardAvoidingView behavior="height" /> : null}
+      {Platform.OS === "android" ? <KeyboardAvoidingView behavior="height" /> : null}
     </View>
   );
 };
@@ -78,4 +109,3 @@ const styles = StyleSheet.create({
 });
 
 export default Chat;
-
