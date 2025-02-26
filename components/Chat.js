@@ -3,8 +3,10 @@ import { StyleSheet, View, Platform, KeyboardAvoidingView } from "react-native";
 import { Bubble, GiftedChat, InputToolbar } from "react-native-gifted-chat";
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import CustomActions from "./CustomActions";
+import MapView from "react-native-maps"; 
 
-const Chat = ({ route, navigation, db, isConnected }) => {
+const Chat = ({ route, navigation, db, isConnected, storage }) => {
   const [messages, setMessages] = useState([]);
   const { userId, name, color } = route.params;
 
@@ -85,12 +87,39 @@ const Chat = ({ route, navigation, db, isConnected }) => {
     return null;
   };
 
+  // Render custom actions (e.g., sending images, locations)
+  const renderCustomActions = (props) => {
+    return <CustomActions {...props} onSend={onSend} storage={storage} userID={userId} />;
+  };
+  
+  
+  // Render MapView if a message contains location data
+  const renderCustomView = (props) => {
+    const { currentMessage } = props;
+    if (currentMessage.location) {
+      return (
+        <MapView
+          style={styles.mapView}
+          region={{
+            latitude: currentMessage.location.latitude,
+            longitude: currentMessage.location.longitude,
+            latitudeDelta: 0.0922,
+            longitudeDelta: 0.0421,
+          }}
+        />
+      );
+    }
+    return null;
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: color }]}>
       <GiftedChat
         messages={messages}
         renderBubble={renderBubble}
-        renderInputToolbar={renderInputToolbar} // 👈 Prevents message input when offline
+        renderInputToolbar={renderInputToolbar}
+        renderActions={renderCustomActions} 
+        renderCustomView={renderCustomView} 
         onSend={(messages) => onSend(messages)}
         user={{
           _id: userId,
@@ -98,14 +127,14 @@ const Chat = ({ route, navigation, db, isConnected }) => {
         }}
       />
       {Platform.OS === "android" ? <KeyboardAvoidingView behavior="height" /> : null}
+      {Platform.OS === "ios" ? <KeyboardAvoidingView behavior="padding" /> : null}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  mapView: { width: 200, height: 150, borderRadius: 10, margin: 5 },
 });
 
 export default Chat;
