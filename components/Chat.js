@@ -13,7 +13,7 @@ const Chat = ({ route, navigation, db, isConnected, storage }) => {
   useEffect(() => {
     navigation.setOptions({ title: name });
 
-    let unsubscribe;
+    let unsubscribe; // Stores the Firestore listener to clean up later
 
     const loadCachedMessages = async () => {
       try {
@@ -27,20 +27,22 @@ const Chat = ({ route, navigation, db, isConnected, storage }) => {
     };
 
     if (isConnected) {
+      // Firestore query: fetch messages ordered by timestamp (newest first)
       const messagesQuery = query(collection(db, "messages"), orderBy("createdAt", "desc"));
 
       unsubscribe = onSnapshot(messagesQuery, async (snapshot) => {
         const messagesList = snapshot.docs.map(doc => {
           const data = doc.data();
           return {
-            _id: doc.id,
+            _id: doc.id, // Firebase document ID as message _id
             ...data,
-            createdAt: data.createdAt ? data.createdAt.toDate() : new Date(),
+            createdAt: data.createdAt ? data.createdAt.toDate() : new Date(), // Convert Firestore timestamp
           };
         });
 
         setMessages(messagesList);
 
+        // Cache messages locally for offline access
         try {
           await AsyncStorage.setItem("messages", JSON.stringify(messagesList));
         } catch (error) {
@@ -48,19 +50,20 @@ const Chat = ({ route, navigation, db, isConnected, storage }) => {
         }
       });
     } else {
-      loadCachedMessages();
+      loadCachedMessages(); // Load cached messages if offline
     }
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      if (unsubscribe) unsubscribe(); // Clean up Firestore listener
     };
   }, [db, isConnected, name, navigation]);
 
   const onSend = (newMessages) => {
     if (isConnected) {
+      // Store message in Firestore with a server-generated timestamp
       addDoc(collection(db, "messages"), {
         ...newMessages[0], 
-        createdAt: serverTimestamp(),
+        createdAt: serverTimestamp(), // Firestore timestamp instead of local time
         user: {
           _id: userId,
           name: name,
@@ -75,25 +78,24 @@ const Chat = ({ route, navigation, db, isConnected, storage }) => {
     <Bubble
       {...props}
       wrapperStyle={{
-        right: { backgroundColor: "#000" },
+        right: { backgroundColor: "#000" }, // Customize bubble colors
         left: { backgroundColor: "#FFF" },
       }}
     />
   );
 
-  // Hide InputToolbar when offline
+  // Hide input field when offline to prevent unsent messages
   const renderInputToolbar = (props) => {
     if (isConnected) return <InputToolbar {...props} />;
     return null;
   };
 
-  // Render custom actions (e.g., sending images, locations)
+  // Custom action button (e.g., image upload, location sharing)
   const renderCustomActions = (props) => {
     return <CustomActions {...props} onSend={onSend} storage={storage} userID={userId} />;
   };
   
-  
-  // Render MapView if a message contains location data
+  // Check if message contains a location object and render a map
   const renderCustomView = (props) => {
     const { currentMessage } = props;
     if (currentMessage.location) {
@@ -126,6 +128,7 @@ const Chat = ({ route, navigation, db, isConnected, storage }) => {
           name: name,
         }}
       />
+      {/* Keyboard behavior adjustments for different platforms */}
       {Platform.OS === "android" ? <KeyboardAvoidingView behavior="height" /> : null}
       {Platform.OS === "ios" ? <KeyboardAvoidingView behavior="padding" /> : null}
     </View>
